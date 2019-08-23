@@ -60,6 +60,8 @@ except ImportError:
           "Check the README for installation instructions." % (sys.VERSION, sys.executable))
     raise
 
+import rfc2217esp
+
 __version__ = "2.6"
 
 MAX_UINT32 = 0xffffffff
@@ -414,7 +416,7 @@ class ESPLoader(object):
         #
         # DTR & RTS are active low signals,
         # ie True = pin @ 0V, False = pin @ VCC.
-        if mode != 'no_reset':
+        if mode != 'no_reset' or mode != 'flush_esp':
             self._setDTR(False)  # IO0=HIGH
             self._setRTS(True)   # EN=LOW, chip in reset
             time.sleep(0.1)
@@ -432,6 +434,10 @@ class ESPLoader(object):
                 time.sleep(0.4)  # allow watchdog reset to occur
             time.sleep(0.05)
             self._setDTR(False)  # IO0=HIGH, done
+
+        # For rfc2217esp://...
+        if mode == 'flush_esp':
+            self._port.flash_esp()
 
         for _ in range(5):
             try:
@@ -2420,7 +2426,7 @@ def main(custom_commandline=None):
     parser.add_argument(
         '--before',
         help='What to do before connecting to the chip',
-        choices=['default_reset', 'no_reset', 'no_reset_no_sync'],
+        choices=['default_reset', 'no_reset', 'no_reset_no_sync', 'flush_esp'],
         default=os.environ.get('ESPTOOL_BEFORE', 'default_reset'))
 
     parser.add_argument(
