@@ -222,6 +222,7 @@ class ESPLoader(object):
         """
         if isinstance(port, basestring):
             self._port = serial.serial_for_url(port)
+            self._port_url = port
         else:
             self._port = port
         self._slip_reader = slip_reader(self._port, self.trace)
@@ -410,13 +411,18 @@ class ESPLoader(object):
         if mode == "no_reset_no_sync":
             return last_error
 
+        # For rfc2217://...
+        if self._port_url.startswith("rfc2217://"):
+            self._port.flash_esp()
+            mode = 'no_reset'
+
         # issue reset-to-bootloader:
         # RTS = either CH_PD/EN or nRESET (both active low = chip in reset
         # DTR = GPIO0 (active low = boot to flasher)
         #
         # DTR & RTS are active low signals,
         # ie True = pin @ 0V, False = pin @ VCC.
-        if mode != 'no_reset' or mode != 'flush_esp':
+        if mode != 'no_reset':
             self._setDTR(False)  # IO0=HIGH
             self._setRTS(True)   # EN=LOW, chip in reset
             time.sleep(0.1)
@@ -434,10 +440,6 @@ class ESPLoader(object):
                 time.sleep(0.4)  # allow watchdog reset to occur
             time.sleep(0.05)
             self._setDTR(False)  # IO0=HIGH, done
-
-        # For rfc2217esp://...
-        if mode == 'flush_esp':
-            self._port.flash_esp()
 
         for _ in range(5):
             try:
@@ -2426,7 +2428,7 @@ def main(custom_commandline=None):
     parser.add_argument(
         '--before',
         help='What to do before connecting to the chip',
-        choices=['default_reset', 'no_reset', 'no_reset_no_sync', 'flush_esp'],
+        choices=['default_reset', 'no_reset', 'no_reset_no_sync'],
         default=os.environ.get('ESPTOOL_BEFORE', 'default_reset'))
 
     parser.add_argument(
